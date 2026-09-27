@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BruxBot Diagnostic Core</title>
+    <style>
+        body { background-color: #0F172A; color: #F8FAFC; font-family: sans-serif; padding: 40px 20px; margin: 0; }
+        .container { max-width: 650px; margin: 0 auto; }
+        h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; letter-spacing: -0.5px; }
+        .subtitle { color: #64748B; font-size: 1rem; margin-bottom: 25px; }
+        .control-panel { background-color: #1E293B; border: 1px solid #334155; padding: 24px; border-radius: 12px; margin-bottom: 20px; }
+        .button-group { display: flex; gap: 12px; margin-bottom: 20px; }
+        button { padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; border: none; width: 50%; }
+        #start-btn { background-color: #38BDF8; color: #0F172A; }
+        #stop-btn { background-color: #EF4444; color: #FFFFFF; }
+        #status { margin-top: 5px; font-weight: bold; color: #94A3B8; text-align: center; font-size: 14px; }
+        .bar-container { margin-top: 18px; }
+        .bar-label { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; color: #CBD5E1; }
+        .bar-bg { background-color: #334155; border-radius: 4px; height: 10px; width: 100%; overflow: hidden; }
+        .bar-fill { height: 100%; width: 0%; border-radius: 4px; transition: width 0.1s ease; }
+        .report-card { background-color: #1E293B; padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-top: 25px; }
+        .report-title { color: #F8FAFC; margin-top: 0; margin-bottom: 15px; font-size: 16px; }
+        .report-item { color: #94A3B8; font-size: 14px; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🦷 BruxBot Diagnostic Core</h1>
+    <div class="subtitle">Real-Time Autonomous Acoustic Biofeedback Platform</div>
+    
+    <div class="control-panel">
+        <div class="button-group">
+            <button id="start-btn" onclick="init()">🌙 Activate Live Microphone & Cloud AI Engine</button>
+            <button id="stop-btn" onclick="stopSession()">🛑 Stop Monitoring & Export Report</button>
+        </div>
+        <div id="status">System Pipeline Status: Offline</div>
+        <div id="label-container"></div>
+    </div>
+
+    <div class="report-card">
+        <div class="report-title">📋 Expected 8-Hour Diagnostics Flow</div>
+        <div class="report-item">• <b>Rolling Buffer Ingestion:</b> Micro-audits audio signals in continuous 2-second windows to optimize local system memory.</div>
+        <div class="report-item">• <b>Signal Distortion Filtering:</b> Automatically ignores common non-bruxism sleep items (tossing, blanket rustle, snoring).</div>
+    </div>
+</div>
+
+<script src="https://jsdelivr.net"></script>
+<script src="https://jsdelivr.net"></script>
+
+<script type="text/javascript">
+    const URL = "https://teachablemachine.withgoogle.com/models/80RGH6W2f/ ";
+    let recognizer;
+    let audioContext;
+    let isMonitoring = false;
+
+    function playRealBiofeedbackTone() {
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let oscillator = audioContext.createOscillator();
+        let gainNode = audioContext.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(150, audioContext.currentTime); 
+        gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 1.2); 
+    }
+
+    async function createModel() {
+        const checkpointURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+        const recognizer = speechCommands.create("BROWSER_FFT", undefined, checkpointURL, metadataURL);
+        await recognizer.ensureModelLoaded();
+        return recognizer;
+    }
+
+    async function init() {
+        if(isMonitoring) return;
+        document.getElementById("status").innerText = "⏳ Loading AI Cloud Matrix... Please wait.";
+        
+        try {
+            recognizer = await createModel();
+            const classLabels = recognizer.wordLabels();
+            const labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "";
+            
+            for (let i = 0; i < classLabels.length; i++) {
+                let div = document.createElement("div");
+                div.className = "bar-container";
+                div.innerHTML = `
+                    <div class="bar-label">
+                        <span>${classLabels[i]}</span>
+                        <strong id="val-${i}">0%</strong>
+                    </div>
+                    <div class="bar-bg">
+                        <div id="fill-${i}" class="bar-fill"></div>
+                    </div>
+                `;
+                labelContainer.appendChild(div);
+            }
+
+            isMonitoring = true;
+            document.getElementById("status").innerText = "🎙️ Hardware Connected. Streaming room acoustics live...";
+            document.getElementById("status").style.color = "#34D399";
+
+            recognizer.listen(result => {
+                for (let i = 0; i < classLabels.length; i++) {
+                    const scorePercentage = (result.scores[i] * 100).toFixed(0);
+                    const labelName = classLabels[i];
+                    const isBruxism = labelName.toLowerCase().includes("grind") || labelName.toLowerCase().includes("teeth");
+                    
+                    document.getElementById(`val-${i}`).innerText = scorePercentage + "%";
+                    let fillBar = document.getElementById(`fill-${i}`);
+                    fillBar.style.width = scorePercentage + "%";
+                    fillBar.style.backgroundColor = isBruxism ? '#EF4444' : '#38BDF8';
+
+                    if (isBruxism && result.scores[i] > 0.85) {
+                        playRealBiofeedbackTone();
+                    }
+                }
+            }, {
+                includeSpectrogram: true,
+                probabilityThreshold: 0.75,
+                invokeCallbackOnNoiseAndUnknown: true,
+                overlapFactor: 0.25
+            });
+        } catch (err) {
+            document.getElementById("status").innerText = "❌ Microphone access denied.";
+            document.getElementById("status").style.color = "#EF4444";
+        }
+    }
+
+    function stopSession() {
+        if (recognizer && isMonitoring) {
+            recognizer.stopListening();
+            isMonitoring = false;
+        }
+        document.getElementById("status").innerText = "🛑 Session Terminated.";
+        document.getElementById("status").style.color = "#EF4444";
+    }
+</script>
+</body>
+</html>
